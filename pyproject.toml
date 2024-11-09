@@ -11,6 +11,9 @@ classifiers = [
 ]
 name = "pytest-perfetto"
 
+[tool.poetry.plugins."pytest11"]
+"pytest-perfetto" = "pytest_perfetto.plugin"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 pytest = "^8.3.3"
