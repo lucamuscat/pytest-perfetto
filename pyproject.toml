@@ -5,9 +5,14 @@ description = ""
 authors = ["Luca Muscat <lucamuscat@gmail.com>"]
 readme = "README.md"
 
+[project]
+classifiers = [
+    "Framework :: Pytest"
+]
+name = "pytest-perfetto"
+
 [tool.poetry.dependencies]
 python = "^3.8"
-
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.7.3"
