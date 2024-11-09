@@ -11,4 +11,9 @@
     "ruff.path": ["${workspaceFolder}/.venv/bin/ruff"],
     "mypy-type-checker.path": ["${workspaceFolder}/.venv/bin/mypy"],
     "mypy-type-checker.importStrategy": "fromEnvironment",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
 }
