@@ -41,3 +41,6 @@ select = [
     "FLY",
     "PERF",
 ]
+
+[tool.mypy]
+strict = true
