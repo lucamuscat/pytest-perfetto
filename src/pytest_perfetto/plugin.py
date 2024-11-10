@@ -9,6 +9,15 @@ from typing import Any, Generator, Optional
 import pytest
 
 
+class TraceEvent:
+    """
+    The Trace Event Format is the trace data representation that is processed byt he Trace
+    Viewer. [This document is the canonical reference on the 'Trace Event Format'](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?tab=t.0)
+    """
+
+    ...
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_pyfunc_call() -> Generator[None, None, None]:
     print("Hello world")
