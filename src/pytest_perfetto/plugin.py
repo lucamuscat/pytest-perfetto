@@ -19,3 +19,11 @@ def pytest_collection() -> Generator[Optional[object], None, None]:
     return result
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_fixture_setup(
+    fixturedef: pytest.FixtureDef[Any],
+) -> Generator[Optional[object], None, None]:
+    start = time()
+    result = yield None
+    print(f"Fixture {fixturedef.argname} took {time() - start}s setting up")
+    return result
