@@ -1,3 +1,8 @@
+"""
+The pytest-perfetto plugin aims to help developers profile their tests by ultimately producing a
+'perfetto' trace file, which may be natively visualized using most Chromium-based browsers.
+"""
+
 from time import time
 from typing import Any, Generator, Optional
 
