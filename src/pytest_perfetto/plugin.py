@@ -11,7 +11,7 @@ from typing import Any, Dict, Generator, Literal, NewType, Optional
 import pytest
 
 Category = NewType("Category", str)
-Timestamp = NewType("Timestamp", int)
+Timestamp = NewType("Timestamp", float)
 
 
 class TraceEvent:
