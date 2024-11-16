@@ -3,10 +3,11 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 'perfetto' trace file, which may be natively visualized using most Chromium-based browsers.
 """
 
-from dataclasses import dataclass
+import json
+import time
+from dataclasses import asdict, dataclass
 from enum import Enum
-from time import time
-from typing import Any, Dict, Generator, Literal, NewType, Optional
+from typing import Any, Dict, Generator, List, Literal, NewType, Optional
 
 import pytest
 
@@ -44,6 +45,7 @@ class Phase(str, Enum):
     """Marks the end of a duration event"""
 
 
+@dataclass(frozen=True)
 class DurationEvent: ...
 
 
@@ -66,6 +68,40 @@ class EndDurationEvent(DurationEvent):
     ph: Literal[Phase.E] = Phase.E
 
 
+events: List[DurationEvent] = []
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_sessionstart() -> Generator[None, None, None]:
+    # Called after the `Session` object has been created and before performing collection and
+    # entering the run test loop.
+    events.append(
+        BeginDurationEvent(
+            name="Session Start",
+            cat=Category("pytest"),
+            ts=Timestamp(time.monotonic()),
+            pid=1,
+            tid=1,
+            args={},
+        )
+    )
+    yield
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_sessionfinish() -> Generator[None, None, None]:
+    # Called after whole test run finished, right before returning the exit status to the system
+    events.append(
+        EndDurationEvent(
+            pid=1,
+            tid=1,
+            ts=Timestamp(time.monotonic()),
+        )
+    )
+    print(json.dumps([asdict(event) for event in events]))
+    yield
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_pyfunc_call() -> Generator[None, None, None]:
     print("Hello world")
@@ -74,10 +110,10 @@ def pytest_pyfunc_call() -> Generator[None, None, None]:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_collection() -> Generator[Optional[object], None, None]:
-    start = time()
+    # start = time()
 
     result = yield None
-    print(f"Time taken collecting tests: {time() - start}")
+    # print(f"Time taken collecting tests: {time() - start}")
     return result
 
 
@@ -85,7 +121,7 @@ def pytest_collection() -> Generator[Optional[object], None, None]:
 def pytest_fixture_setup(
     fixturedef: pytest.FixtureDef[Any],
 ) -> Generator[Optional[object], None, None]:
-    start = time()
+    # start = time()
     result = yield None
-    print(f"Fixture {fixturedef.argname} took {time() - start}s setting up")
+    # print(f"Fixture {fixturedef.argname} took {time() - start}s setting up")
     return result
