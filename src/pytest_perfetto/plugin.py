@@ -109,12 +109,30 @@ def pytest_pyfunc_call() -> Generator[None, None, None]:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_collection() -> Generator[Optional[object], None, None]:
-    # start = time()
+def pytest_collection() -> Generator[None, None, None]:
+    events.append(
+        BeginDurationEvent(
+            name="Start Collection",
+            cat=Category("pytest"),
+            ts=Timestamp(time.monotonic()),
+            args={},
+            pid=1,
+            tid=1,
+        )
+    )
+    yield
 
-    result = yield None
-    # print(f"Time taken collecting tests: {time() - start}")
-    return result
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_collection_finish() -> Generator[None, None, None]:
+    events.append(
+        EndDurationEvent(
+            pid=1,
+            tid=1,
+            ts=Timestamp(time.monotonic()),
+        )
+    )
+    yield
 
 
 @pytest.hookimpl(hookwrapper=True)
