@@ -145,3 +145,35 @@ def pytest_fixture_setup(
     result = yield None
     # print(f"Fixture {fixturedef.argname} took {time() - start}s setting up")
     return result
+
+
+# ===== Test running (runtest) hooks =====
+# https://docs.pytest.org/en/7.1.x/reference/reference.html#test-running-runtest-hooks
+
+
+def create_args_from_location(location: Tuple[str, Optional[int], str]) -> Dict[str, str]:
+    (file_name, line_number, test_name) = location
+
+    args = {"file_name": file_name, "test_name": test_name}
+
+    if line_number is not None:
+        args["line_number"] = str(line_number)
+
+    return args
+
+
+def pytest_runtest_logstart(nodeid: str, location: Tuple[str, Optional[int], str]) -> None:
+    events.append(
+        BeginDurationEvent(
+            name=nodeid,
+            args=create_args_from_location(location),
+            cat=Category("test"),
+            pid=1,
+            tid=1,
+            ts=Timestamp(time.monotonic()),
+        )
+    )
+
+
+def pytest_runtest_logfinish() -> None:
+    events.append(EndDurationEvent(pid=1, tid=1, ts=Timestamp(time.monotonic())))
