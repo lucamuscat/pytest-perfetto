@@ -98,7 +98,8 @@ def pytest_sessionfinish() -> Generator[None, None, None]:
             ts=Timestamp(time.monotonic()),
         )
     )
-    print(json.dumps([asdict(event) for event in events]))
+    with Path(f"{session.startpath}/trace.json").open("w") as file:
+        json.dump([asdict(event) for event in events], file)
     yield
 
 
