@@ -5,9 +5,10 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 
 import json
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, Generator, List, Literal, NewType, Optional
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Literal, NewType, Optional, Tuple
 
 import pytest
 
@@ -53,18 +54,18 @@ class DurationEvent: ...
 class BeginDurationEvent(DurationEvent):
     name: str
     cat: Category
-    ts: Timestamp
-    pid: int
-    tid: int
-    args: Dict[str, Any]
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
+    pid: int = 1
+    tid: int = 1
+    args: Dict[str, Any] = field(default_factory=dict)
     ph: Literal[Phase.B] = Phase.B
 
 
 @dataclass(frozen=True)
 class EndDurationEvent(DurationEvent):
-    pid: int
-    tid: int
-    ts: Timestamp
+    pid: int = 1
+    tid: int = 1
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
     ph: Literal[Phase.E] = Phase.E
 
 
@@ -77,12 +78,8 @@ def pytest_sessionstart() -> Generator[None, None, None]:
     # entering the run test loop.
     events.append(
         BeginDurationEvent(
-            name="Session Start",
+            name="pytest session",
             cat=Category("pytest"),
-            ts=Timestamp(time.monotonic()),
-            pid=1,
-            tid=1,
-            args={},
         )
     )
     yield
@@ -92,13 +89,7 @@ def pytest_sessionstart() -> Generator[None, None, None]:
 def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]:
     # Called after whole test run finished, right before returning the exit status to the system
     # https://docs.pytest.org/en/7.1.x/reference/reference.html#pytest.hookspec.pytest_sessionfinish
-    events.append(
-        EndDurationEvent(
-            pid=1,
-            tid=1,
-            ts=Timestamp(time.monotonic()),
-        )
-    )
+    events.append(EndDurationEvent())
     with Path(f"{session.startpath}/trace.json").open("w") as file:
         json.dump([asdict(event) for event in events], file)
     yield
@@ -110,10 +101,6 @@ def pytest_collection() -> Generator[None, None, None]:
         BeginDurationEvent(
             name="Start Collection",
             cat=Category("pytest"),
-            ts=Timestamp(time.monotonic()),
-            args={},
-            pid=1,
-            tid=1,
         )
     )
     yield
@@ -121,13 +108,7 @@ def pytest_collection() -> Generator[None, None, None]:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_collection_finish() -> Generator[None, None, None]:
-    events.append(
-        EndDurationEvent(
-            pid=1,
-            tid=1,
-            ts=Timestamp(time.monotonic()),
-        )
-    )
+    events.append(EndDurationEvent())
     yield
 
 
@@ -152,12 +133,9 @@ def pytest_runtest_logstart(nodeid: str, location: Tuple[str, Optional[int], str
             name=nodeid,
             args=create_args_from_location(location),
             cat=Category("test"),
-            pid=1,
-            tid=1,
-            ts=Timestamp(time.monotonic()),
         )
     )
 
 
 def pytest_runtest_logfinish() -> None:
-    events.append(EndDurationEvent(pid=1, tid=1, ts=Timestamp(time.monotonic())))
+    events.append(EndDurationEvent())
