@@ -137,16 +137,6 @@ def pytest_collection_finish() -> Generator[None, None, None]:
     yield
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_fixture_setup(
-    fixturedef: pytest.FixtureDef[Any],
-) -> Generator[Optional[object], None, None]:
-    # start = time()
-    result = yield None
-    # print(f"Fixture {fixturedef.argname} took {time() - start}s setting up")
-    return result
-
-
 # ===== Test running (runtest) hooks =====
 # https://docs.pytest.org/en/7.1.x/reference/reference.html#test-running-runtest-hooks
 
