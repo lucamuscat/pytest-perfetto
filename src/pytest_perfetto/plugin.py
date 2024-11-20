@@ -135,6 +135,10 @@ def pytest_collection() -> Generator[None, None, None]:
     yield
 
 
+def pytest_itemcollected(item: pytest.Item) -> None:
+    events.append(InstantEvent(name=f"[Item Collected] {item.nodeid}"))
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_collection_finish() -> Generator[None, None, None]:
     events.append(EndDurationEvent())
