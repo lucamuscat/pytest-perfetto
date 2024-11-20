@@ -8,7 +8,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Literal, NewType, Optional, Tuple
+from typing import Any, Dict, Generator, List, Literal, NewType, Optional, Tuple, Union
 
 import pytest
 
@@ -38,12 +38,16 @@ class Phase(str, Enum):
         'E' events may be nested, allowing the capturing of function calling behaviour on a thread.
         The timestamps for duration events must be in an increasing order for a given thread.
         Timestamps in different threads do not have to be in increasing order.
+    * Instant Events:
+        Instant events correspond to something that happens but has no duration associated with it.
     """
 
     B = "B"
     """Marks the beginning of a duration event."""
     E = "E"
     """Marks the end of a duration event"""
+    i = "i"
+    """Marks an instant event"""
 
 
 @dataclass(frozen=True)
@@ -69,7 +73,32 @@ class EndDurationEvent(DurationEvent):
     ph: Literal[Phase.E] = Phase.E
 
 
-events: List[DurationEvent] = []
+class InstantScope(str, Enum):
+    """Specifies the scope of the instant event. The scope of the event designates how tall to draw
+    the instant even in Trace Viewer."""
+
+    g = "g"
+    """Global scoped instant event. A global scoped event will draw a line from the top to the
+    bottom of the timeline."""
+    p = "p"
+    """Process scoped instant event. A process scoped instant event will draw through all threads of
+    a given process."""
+    t = "t"
+    """Thread scoped instant event. A thread scoped instant event will draw the height of a single
+    thread."""
+
+
+@dataclass(frozen=True)
+class InstantEvent(TraceEvent):
+    name: str
+    pid: int = 1
+    tid: int = 1
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
+    ph: Literal[Phase.i] = Phase.i
+    s: InstantScope = InstantScope.t
+
+
+events: List[Union[DurationEvent, InstantEvent]] = []
 
 
 @pytest.hookimpl(hookwrapper=True)
