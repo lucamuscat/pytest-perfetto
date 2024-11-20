@@ -105,12 +105,6 @@ def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_pyfunc_call() -> Generator[None, None, None]:
-    print("Hello world")
-    yield
-
-
-@pytest.hookimpl(hookwrapper=True)
 def pytest_collection() -> Generator[None, None, None]:
     events.append(
         BeginDurationEvent(
