@@ -89,8 +89,9 @@ def pytest_sessionstart() -> Generator[None, None, None]:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_sessionfinish() -> Generator[None, None, None]:
+def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]:
     # Called after whole test run finished, right before returning the exit status to the system
+    # https://docs.pytest.org/en/7.1.x/reference/reference.html#pytest.hookspec.pytest_sessionfinish
     events.append(
         EndDurationEvent(
             pid=1,
