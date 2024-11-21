@@ -176,4 +176,10 @@ def pytest_runtest_logfinish() -> None:
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    print(report.when, report.duration, report.start, report.stop)
+    if report.when is None:
+        return
+
+    events.append(
+        BeginDurationEvent(name=report.when, cat=Category("test"), ts=Timestamp(report.start))
+    )
+    events.append(EndDurationEvent(ts=Timestamp(report.stop)))
