@@ -59,7 +59,7 @@ class DurationEvent: ...
 class BeginDurationEvent(DurationEvent):
     name: str
     cat: Category
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
     pid: int = 1
     tid: int = 1
     args: Dict[str, Any] = field(default_factory=dict)
@@ -70,7 +70,7 @@ class BeginDurationEvent(DurationEvent):
 class EndDurationEvent(DurationEvent):
     pid: int = 1
     tid: int = 1
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
     ph: Literal[Phase.E] = Phase.E
 
 
@@ -94,7 +94,7 @@ class InstantEvent(TraceEvent):
     name: str
     pid: int = 1
     tid: int = 1
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.monotonic()))
+    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
     ph: Literal[Phase.i] = Phase.i
     s: InstantScope = InstantScope.t
 
@@ -173,3 +173,7 @@ def pytest_runtest_logstart(nodeid: str, location: Tuple[str, Optional[int], str
 
 def pytest_runtest_logfinish() -> None:
     events.append(EndDurationEvent())
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    print(report.when, report.duration, report.start, report.stop)
