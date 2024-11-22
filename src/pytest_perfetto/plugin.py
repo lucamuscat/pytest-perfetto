@@ -183,3 +183,21 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
         BeginDurationEvent(name=report.when, cat=Category("test"), ts=Timestamp(report.start))
     )
     events.append(EndDurationEvent(ts=Timestamp(report.stop)))
+
+
+# ===== Reporting hooks =====
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_fixture_setup(fixturedef: pytest.FixtureDef[Any]) -> Generator[None, None, None]:
+    args = {
+        "argnames": fixturedef.argnames,
+        "baseid": fixturedef.baseid,
+        "ids": fixturedef.ids,
+        "params": fixturedef.params,
+        "scope": fixturedef.scope,
+    }
+    events.append(BeginDurationEvent(name=fixturedef.argname, cat=Category("test"), args=args))
+    yield
+    events.append(EndDurationEvent())
+    pass
