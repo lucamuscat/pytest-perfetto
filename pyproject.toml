@@ -50,6 +50,9 @@ select = [
     "FLY",
     "PERF",
 ]
+ignore = [
+    "S101"
+]
 
 [tool.mypy]
 strict = true
