@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Final, Generator, List, Optional, Tuple, Union
 
+import pyinstrument
 import pytest
 from _pytest.config import Notset
 
@@ -19,6 +20,7 @@ from pytest_perfetto import (
     SerializableEvent,
     Timestamp,
 )
+from pytest_perfetto.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 
@@ -105,13 +107,25 @@ def pytest_runtest_logfinish() -> None:
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    if report.when is None:
+    if report.when is None or report.when == "call":
         return
 
     events.append(
         BeginDurationEvent(name=report.when, cat=Category("test"), ts=Timestamp(report.start))
     )
     events.append(EndDurationEvent(ts=Timestamp(report.stop)))
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Generator[None, None, None]:
+    global events  # noqa: PLW0603
+    start_event = BeginDurationEvent(name="call", cat=Category("test"))
+    events.append(start_event)
+    with pyinstrument.Profiler() as profile:
+        yield
+    if profile.last_session is not None:
+        events += render(profile.last_session, start_time=start_event.ts)
+    events.append(EndDurationEvent())
 
 
 # ===== Reporting hooks =====
