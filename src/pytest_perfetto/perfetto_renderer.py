@@ -32,6 +32,18 @@ def is_pytest_related_frame(frame: Frame) -> bool:
     return False
 
 
+class RootFrameCannotBeHoistedException(Exception):
+    """The root frame cannot be hoisted"""
+
+
+def hoist(frame: Frame) -> None:
+    """Removes the frame `frame`, placing the removed frame's children in its place."""
+    if frame.parent is None:
+        raise RootFrameCannotBeHoistedException()
+    frame.parent.add_children(frame.children, after=frame)
+    frame.remove_from_parent()  # type: ignore
+
+
 def render(session: Session, start_time: float) -> List[SerializableEvent]:
     renderer = SpeedscopeRenderer()
     root_frame = session.root_frame()
