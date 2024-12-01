@@ -24,15 +24,16 @@ from pytest_perfetto.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 
-events: List[SerializableEvent] = []
-
 
 class PytestPerfettoPlugin:
+    def __init__(self) -> None:
+        self.events: List[SerializableEvent] = []
+
     @pytest.hookimpl(hookwrapper=True)
     def pytest_sessionstart(self) -> Generator[None, None, None]:
         # Called after the `Session` object has been created and before performing collection and
         # entering the run test loop.
-        events.append(
+        self.events.append(
             BeginDurationEvent(
                 name="pytest session",
                 cat=Category("pytest"),
@@ -44,11 +45,11 @@ class PytestPerfettoPlugin:
     def pytest_sessionfinish(self, session: pytest.Session) -> Generator[None, None, None]:
         # Called after whole test run finished, right before returning the exit status to the system
         # https://docs.pytest.org/en/7.1.x/reference/reference.html#pytest.hookspec.pytest_sessionfinish
-        events.append(EndDurationEvent())
+        self.events.append(EndDurationEvent())
         perfetto_path: Union[Path, Notset] = session.config.getoption("perfetto_path")
         if isinstance(perfetto_path, Path):
             with perfetto_path.open("w") as file:
-                result = [asdict(event) for event in events]
+                result = [asdict(event) for event in self.events]
                 for event in result:
                     # Python's time.time() produces timestamps using a seconds as its granularity,
                     # whilst perfetto uses a miceosecond granularity.
@@ -59,7 +60,7 @@ class PytestPerfettoPlugin:
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_collection(self) -> Generator[None, None, None]:
-        events.append(
+        self.events.append(
             BeginDurationEvent(
                 name="Start Collection",
                 cat=Category("pytest"),
@@ -68,11 +69,11 @@ class PytestPerfettoPlugin:
         yield
 
     def pytest_itemcollected(self, item: pytest.Item) -> None:
-        events.append(InstantEvent(name=f"[Item Collected] {item.nodeid}"))
+        self.events.append(InstantEvent(name=f"[Item Collected] {item.nodeid}"))
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_collection_finish(self) -> Generator[None, None, None]:
-        events.append(EndDurationEvent())
+        self.events.append(EndDurationEvent())
         yield
 
     # ===== Test running (runtest) hooks =====
@@ -91,7 +92,7 @@ class PytestPerfettoPlugin:
     def pytest_runtest_logstart(
         self, nodeid: str, location: Tuple[str, Optional[int], str]
     ) -> None:
-        events.append(
+        self.events.append(
             BeginDurationEvent(
                 name=nodeid,
                 args=PytestPerfettoPlugin.create_args_from_location(location),
@@ -100,27 +101,26 @@ class PytestPerfettoPlugin:
         )
 
     def pytest_runtest_logfinish(self) -> None:
-        events.append(EndDurationEvent())
+        self.events.append(EndDurationEvent())
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         if report.when is None or report.when == "call":
             return
 
-        events.append(
+        self.events.append(
             BeginDurationEvent(name=report.when, cat=Category("test"), ts=Timestamp(report.start))
         )
-        events.append(EndDurationEvent(ts=Timestamp(report.stop)))
+        self.events.append(EndDurationEvent(ts=Timestamp(report.stop)))
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_call(self) -> Generator[None, None, None]:
-        global events  # noqa: PLW0603
         start_event = BeginDurationEvent(name="call", cat=Category("test"))
-        events.append(start_event)
+        self.events.append(start_event)
         with pyinstrument.Profiler() as profile:
             yield
         if profile.last_session is not None:
-            events += render(profile.last_session, start_time=start_event.ts)
-        events.append(EndDurationEvent())
+            self.events += render(profile.last_session, start_time=start_event.ts)
+        self.events.append(EndDurationEvent())
 
     # ===== Reporting hooks =====
 
@@ -135,9 +135,11 @@ class PytestPerfettoPlugin:
             "params": fixturedef.params,
             "scope": fixturedef.scope,
         }
-        events.append(BeginDurationEvent(name=fixturedef.argname, cat=Category("test"), args=args))
+        self.events.append(
+            BeginDurationEvent(name=fixturedef.argname, cat=Category("test"), args=args)
+        )
         yield
-        events.append(EndDurationEvent())
+        self.events.append(EndDurationEvent())
         pass
 
 
