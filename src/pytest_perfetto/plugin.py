@@ -117,7 +117,7 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_call(item: pytest.Item) -> Generator[None, None, None]:
+def pytest_runtest_call() -> Generator[None, None, None]:
     global events  # noqa: PLW0603
     start_event = BeginDurationEvent(name="call", cat=Category("test"))
     events.append(start_event)

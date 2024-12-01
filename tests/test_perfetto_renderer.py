@@ -3,7 +3,10 @@ from typing import List
 import pytest
 from pyinstrument.frame import Frame
 
-from pytest_perfetto.perfetto_renderer import RootFrameCannotBeHoistedException, hoist
+from pytest_perfetto.perfetto_renderer import (
+    RootFrameCannotBeHoistedException,
+    hoist,
+)
 
 
 def test_when_hoist__then_grandchild_frame_becomes_parent_sibling() -> None:
