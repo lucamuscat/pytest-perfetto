@@ -21,11 +21,16 @@ from pytest_perfetto import (
     Timestamp,
 )
 
-BLACKLISTED_PYTEST_LOCATIONS: List[str] = [
-    str(Path(pytest.__file__).parent),
-    str(Path(pluggy.__file__).parent),
-    str(Path(_pytest.__file__).parent),
-]
+BLACKLISTED_MODULES = [pytest, pluggy, _pytest]
+
+BLACKLISTED_PYTEST_LOCATIONS: List[str] = []
+
+for blacklisted_module in BLACKLISTED_MODULES:
+    if not blacklisted_module.__file__:
+        raise ValueError(
+            f"The file path for the module {blacklisted_module.__name__} was not found"
+        )
+    BLACKLISTED_PYTEST_LOCATIONS.append(str(Path(blacklisted_module.__file__).parent))
 
 
 def is_pytest_related_frame(frame: Frame) -> bool:

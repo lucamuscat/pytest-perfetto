@@ -1,9 +1,13 @@
+import json
+from pathlib import Path
+from types import ModuleType
 from typing import List
 
 import pytest
 from pyinstrument.frame import Frame
 
 from pytest_perfetto.perfetto_renderer import (
+    BLACKLISTED_MODULES,
     RootFrameCannotBeHoistedException,
     hoist,
 )
@@ -65,3 +69,29 @@ def test_given_siblings__when_hoist__then_hoisted_children_are_correctly_ordered
     assert grandparent.children[1].identifier == "powder"
     assert grandparent.children[2].identifier == "violet"
     assert grandparent.children[3].identifier == "parent3"
+
+
+@pytest.mark.parametrize("blacklisted_module", BLACKLISTED_MODULES)
+def test_when_export_trace__then_pytest_stacks_are_not_included(
+    pytester: pytest.Pytester, temp_perfetto_file_path: Path, blacklisted_module: ModuleType
+) -> None:
+    pytester.makepyfile("""
+        from time import time
+        def test_do_work() -> None:
+            start = time()
+            while (time() - start) < 0.05:
+                print(start**4)
+    """)
+    result = pytester.runpytest_subprocess(f"--perfetto={temp_perfetto_file_path}")
+    result.assert_outcomes(passed=1)
+
+    # In theory, the best way of querying the perfetto trace file is to use the perfetto package.
+    # Unfortunately, the initialization of the trace processor provided by the perfetto package is
+    # slow, and is prone to throwing exceptions when multiple trace providers are running.
+    trace_file = json.load(temp_perfetto_file_path.open("r"))
+    for event in trace_file:
+        args = event.get("args")
+        if args:
+            file_arg = args.get("file")
+            if file_arg:
+                assert f"/{blacklisted_module.__name__}/" not in file_arg
