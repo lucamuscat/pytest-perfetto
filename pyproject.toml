@@ -17,6 +17,7 @@ name = "pytest-perfetto"
 [tool.poetry.dependencies]
 python = "^3.8"
 pytest = "^8.3.3"
+pyinstrument = "^5.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.7.3"

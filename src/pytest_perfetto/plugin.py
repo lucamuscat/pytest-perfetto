@@ -4,104 +4,27 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 """
 
 import json
-import time
-from dataclasses import asdict, dataclass, field
-from enum import Enum
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Final, Generator, List, Literal, NewType, Optional, Tuple, Union
+from typing import Any, Dict, Final, Generator, List, Optional, Tuple, Union
 
+import pyinstrument
 import pytest
 from _pytest.config import Notset
 
-Category = NewType("Category", str)
-Timestamp = NewType("Timestamp", float)
+from pytest_perfetto import (
+    BeginDurationEvent,
+    Category,
+    EndDurationEvent,
+    InstantEvent,
+    SerializableEvent,
+    Timestamp,
+)
+from pytest_perfetto.perfetto_renderer import render
+
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 
-
-class TraceEvent:
-    """
-    The Trace Event Format is the trace data representation that is processed by the Trace
-    Viewer. [This document is the canonical reference on the 'Trace Event Format'](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?tab=t.0)
-    """
-
-    ...
-
-
-class Phase(str, Enum):
-    """
-    The phase describes the event's type. The phase is a single character which changes depending on
-    the type of event. This class encapsulates all the valid phase types.
-
-    The following is a description of some of the valid event types:
-
-    * Duration Events:
-        Duration events provide a way of marking a duration of work on a given thread. Duration
-        events are marked by the 'B' & 'E' phase types. The 'B' event must come before the 'E'
-        event. 'B' & 'E' events may be nested, allowing the capturing of function calling behaviour
-        on a thread. The timestamps for duration events must be in an increasing order for a given
-        thread. Timestamps in different threads do not have to be in increasing order.
-    * Instant Events:
-        Instant events, or points in time, that correspond to an event that happens but has no
-        associated duration.
-    """
-
-    B = "B"
-    """Marks the beginning of a duration event."""
-    E = "E"
-    """Marks the end of a duration event."""
-    i = "i"
-    """Marks an instant event."""
-
-
-@dataclass(frozen=True)
-class DurationEvent: ...
-
-
-@dataclass(frozen=True)
-class BeginDurationEvent(DurationEvent):
-    name: str
-    cat: Category
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
-    pid: int = 1
-    tid: int = 1
-    args: Dict[str, Any] = field(default_factory=dict)
-    ph: Literal[Phase.B] = Phase.B
-
-
-@dataclass(frozen=True)
-class EndDurationEvent(DurationEvent):
-    pid: int = 1
-    tid: int = 1
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
-    ph: Literal[Phase.E] = Phase.E
-
-
-class InstantScope(str, Enum):
-    """Specifies the scope of the instant event. The scope of the event designates how tall to draw
-    the instant even in Trace Viewer."""
-
-    g = "g"
-    """Global scoped instant event. A globally scoped event will draw a line from the top to the
-    bottom of the timeline."""
-    p = "p"
-    """Process scoped instant event. A process scoped instant event will draw through all threads of
-    a given process."""
-    t = "t"
-    """Thread scoped instant event. A thread scoped instant event will draw the height of a single
-    thread."""
-
-
-@dataclass(frozen=True)
-class InstantEvent(TraceEvent):
-    name: str
-    pid: int = 1
-    tid: int = 1
-    ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
-    ph: Literal[Phase.i] = Phase.i
-    s: InstantScope = InstantScope.t
-
-
-events: List[Union[DurationEvent, InstantEvent]] = []
+events: List[SerializableEvent] = []
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -127,6 +50,8 @@ def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]
         with perfetto_path.open("w") as file:
             result = [asdict(event) for event in events]
             for event in result:
+                # Python's time.time() produces timestamps using a seconds as its granularity,
+                # whilst perfetto uses a miceosecond granularity.
                 event["ts"] /= 1e-6
 
             json.dump(result, file)
@@ -184,13 +109,25 @@ def pytest_runtest_logfinish() -> None:
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    if report.when is None:
+    if report.when is None or report.when == "call":
         return
 
     events.append(
         BeginDurationEvent(name=report.when, cat=Category("test"), ts=Timestamp(report.start))
     )
     events.append(EndDurationEvent(ts=Timestamp(report.stop)))
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call() -> Generator[None, None, None]:
+    global events  # noqa: PLW0603
+    start_event = BeginDurationEvent(name="call", cat=Category("test"))
+    events.append(start_event)
+    with pyinstrument.Profiler() as profile:
+        yield
+    if profile.last_session is not None:
+        events += render(profile.last_session, start_time=start_event.ts)
+    events.append(EndDurationEvent())
 
 
 # ===== Reporting hooks =====
