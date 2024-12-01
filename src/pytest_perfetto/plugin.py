@@ -125,7 +125,11 @@ def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]
     perfetto_path: Union[Path, Notset] = session.config.getoption("perfetto_path")
     if isinstance(perfetto_path, Path):
         with perfetto_path.open("w") as file:
-            json.dump([asdict(event) for event in events], file)
+            result = [asdict(event) for event in events]
+            for event in result:
+                event["ts"] /= 1e-6
+
+            json.dump(result, file)
     yield
 
 
