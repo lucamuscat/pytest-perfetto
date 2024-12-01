@@ -50,6 +50,8 @@ def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]
         with perfetto_path.open("w") as file:
             result = [asdict(event) for event in events]
             for event in result:
+                # Python's time.time() produces timestamps using a seconds as its granularity,
+                # whilst perfetto uses a miceosecond granularity.
                 event["ts"] /= 1e-6
 
             json.dump(result, file)
