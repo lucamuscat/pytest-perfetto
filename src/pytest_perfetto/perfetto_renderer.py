@@ -96,7 +96,7 @@ def render(session: Session, start_time: float) -> List[SerializableEvent]:
             if speedscope_event.type == SpeedscopeEventType.OPEN:
                 result.append(
                     BeginDurationEvent(
-                        name=inverted_speedscope_index[speedscope_event.frame].name or "nothing",
+                        name=name or "nothing",
                         cat=Category("runtime"),
                         ts=timestamp,
                         args={"file": file, "line": line, "name": name},
