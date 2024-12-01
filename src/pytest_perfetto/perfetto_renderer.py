@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, Final, List, Optional, Sequence
 
+import _pytest
 import pluggy
 import pytest
 from pyinstrument.frame import Frame
@@ -23,6 +24,7 @@ from pytest_perfetto import (
 BLACKLISTED_PYTEST_LOCATIONS: List[str] = [
     str(Path(pytest.__file__).parent),
     str(Path(pluggy.__file__).parent),
+    str(Path(_pytest.__file__).parent),
 ]
 
 
