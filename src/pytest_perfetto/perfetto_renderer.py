@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Sequence
 import _pytest
 import pluggy
 import pytest
-from pyinstrument.frame import Frame
+from pyinstrument.frame import SYNTHETIC_LEAF_IDENTIFIERS, Frame
 from pyinstrument.renderers.speedscope import (
     SpeedscopeEvent,
     SpeedscopeEventType,
@@ -93,7 +93,10 @@ def render(session: Session, start_time: float) -> List[SerializableEvent]:
             line: Optional[int] = speedscope_frame.line if speedscope_frame else None
             name: Optional[str] = speedscope_frame.name if speedscope_frame else None
             timestamp: Timestamp = Timestamp(speedscope_event.at + start_time)
-            if speedscope_event.type == SpeedscopeEventType.OPEN and name != "[self]":
+            if (
+                speedscope_event.type == SpeedscopeEventType.OPEN
+                and name not in SYNTHETIC_LEAF_IDENTIFIERS
+            ):
                 result.append(
                     BeginDurationEvent(
                         name=name or "nothing",
@@ -102,7 +105,10 @@ def render(session: Session, start_time: float) -> List[SerializableEvent]:
                         args={"file": file, "line": line, "name": name},
                     )
                 )
-            elif speedscope_event.type == SpeedscopeEventType.CLOSE and name != "[self]":
+            elif (
+                speedscope_event.type == SpeedscopeEventType.CLOSE
+                and name not in SYNTHETIC_LEAF_IDENTIFIERS
+            ):
                 result.append(EndDurationEvent(ts=timestamp))
         return result
 
