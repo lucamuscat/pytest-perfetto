@@ -3,6 +3,7 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 'perfetto' trace file, which may be natively visualized using most Chromium-based browsers.
 """
 
+import inspect
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -113,10 +114,12 @@ class PytestPerfettoPlugin:
         self.events.append(EndDurationEvent(ts=Timestamp(report.stop)))
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_call(self) -> Generator[None, None, None]:
+    def pytest_pyfunc_call(self, pyfuncitem: pytest.Function) -> Generator[None, None, None]:
         start_event = BeginDurationEvent(name="call", cat=Category("test"))
         self.events.append(start_event)
-        with pyinstrument.Profiler() as profile:
+        is_async = inspect.iscoroutinefunction(pyfuncitem.function)
+        profiler_async_mode = "enabled" if is_async else "disabled"
+        with pyinstrument.Profiler(async_mode=profiler_async_mode) as profile:
             yield
         if profile.last_session is not None:
             self.events += render(profile.last_session, start_time=start_event.ts)
