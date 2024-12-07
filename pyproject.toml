@@ -58,3 +58,4 @@ ignore = [
 
 [tool.mypy]
 strict = true
+disable_error_code = "import-untyped"

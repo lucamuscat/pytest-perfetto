@@ -3,15 +3,31 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 'perfetto' trace file, which may be natively visualized using most Chromium-based browsers.
 """
 
+import functools
 import inspect
 import json
+import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Final, Generator, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Final,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
+import execnet
 import pyinstrument
 import pytest
 from _pytest.config import Notset
+from xdist.workermanage import WorkerController
 
 from pytest_perfetto import (
     BeginDurationEvent,
@@ -146,6 +162,59 @@ class PytestPerfettoPlugin:
         pass
 
 
+# TODO: Ensure that plugin is not registered if the xdist plugin is not registered.
+
+COLLECT_START_TIMESTAMP_KEY: pytest.StashKey[Dict[str, float]] = pytest.StashKey()
+
+
+def process_from_remote_wrapper(f: Callable[..., None], node: WorkerController) -> Any:
+    @functools.wraps(f)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        message_name: str = args[0][0]
+        if message_name == "collectionstart":
+            stash = node.config.stash
+            stash[COLLECT_START_TIMESTAMP_KEY] = {
+                str(node.gateway.id): time.time(),
+                **stash.get(COLLECT_START_TIMESTAMP_KEY, {}),
+            }
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+class XDistExperimentPlugin:
+    """pytest-xdist hooks are defined
+    [here](https://github.com/pytest-dev/pytest-xdist/blob/master/src/xdist/newhooks.py)"""
+
+    def __init__(self, config: pytest.Config) -> None:
+        self.workers: List[WorkerController] = []
+        self.config = config
+
+    def pytest_xdist_setupnodes(
+        self, config: pytest.Config, specs: Sequence[execnet.XSpec]
+    ) -> None:
+        # print("pytest_xdist_setupnodes", config, specs)
+        ...
+
+    def pytest_xdist_node_collection_finished(
+        self, node: WorkerController, ids: Sequence[str]
+    ) -> None:
+        # print("pytest_xdist_node_collection_finished", node, ids)
+        ...
+
+    def pytest_configure_node(self, node: WorkerController) -> None:
+        print("pytest_configure_node", node)
+        node.process_from_remote = process_from_remote_wrapper(node.process_from_remote, node)
+        self.workers.append(node)
+
+    def pytest_testnodeready(self, node: WorkerController) -> None:
+        # print("pytest_testnodeready", node)
+        ...
+
+    def pytest_sessionfinish(self) -> None:
+        print(self.config.stash.get(cast(pytest.StashKey[object], COLLECT_START_TIMESTAMP_KEY), {}))
+
+
 # ===== Initialization hooks =====
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
@@ -163,3 +232,4 @@ def pytest_configure(config: pytest.Config) -> None:
     if isinstance(option, Path) and option.is_dir():
         raise ValueError("The provided path must not be a directory")
     config.pluginmanager.register(PytestPerfettoPlugin())
+    config.pluginmanager.register(XDistExperimentPlugin(config=config))
