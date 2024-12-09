@@ -165,8 +165,7 @@ class PytestPerfettoPlugin:
 # TODO: Ensure that plugin is not registered if the xdist plugin is not registered.
 
 COLLECT_START_TIMESTAMP_KEY: pytest.StashKey[Dict[str, float]] = pytest.StashKey()
-
-
+# EVENTS: pytest.StashKey[List[SerializableEvent]] = pytest.StashKey()
 
 
 class XDistExperimentPlugin:
@@ -178,6 +177,20 @@ class XDistExperimentPlugin:
         self.config = config
 
     def process_from_remote_wrapper(self, f: Callable[..., None], node: WorkerController) -> Any:
+        """pytest-xdist does not track how long the collection phase takes. Although pytest-xdist
+        offers a hook that's triggered when collection is finished
+        (`pytest_xdist_node_collection_finished`), it does not provide a hook for tracking when the
+        collection starts.
+
+        Internally, pytest-xdist's 'controller' worker (i.e., the worker that coordinates the test
+        runner processes) receives messages from said test runner processes through an execnet
+        gateway/channel, these messages are centrally processed in a method called
+        `process_from_remote`.
+
+        By intercepting calls to this internal method, which is what we are doing with this
+        wrapper, we can approximate when a node has started collection.
+        """
+
         @functools.wraps(f)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             message_name: str = args[0][0]
