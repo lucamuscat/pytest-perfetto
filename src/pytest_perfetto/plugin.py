@@ -167,19 +167,6 @@ class PytestPerfettoPlugin:
 COLLECT_START_TIMESTAMP_KEY: pytest.StashKey[Dict[str, float]] = pytest.StashKey()
 
 
-def process_from_remote_wrapper(f: Callable[..., None], node: WorkerController) -> Any:
-    @functools.wraps(f)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        message_name: str = args[0][0]
-        if message_name == "collectionstart":
-            stash = node.config.stash
-            stash[COLLECT_START_TIMESTAMP_KEY] = {
-                str(node.gateway.id): time.time(),
-                **stash.get(COLLECT_START_TIMESTAMP_KEY, {}),
-            }
-        return f(*args, **kwargs)
-
-    return wrapper
 
 
 class XDistExperimentPlugin:
@@ -190,21 +177,35 @@ class XDistExperimentPlugin:
         self.workers: List[WorkerController] = []
         self.config = config
 
+    def process_from_remote_wrapper(self, f: Callable[..., None], node: WorkerController) -> Any:
+        @functools.wraps(f)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            message_name: str = args[0][0]
+            if message_name == "collectionstart":
+                stash = node.config.stash
+                stash[COLLECT_START_TIMESTAMP_KEY] = {
+                    str(node.gateway.id): time.time(),
+                    **stash.get(COLLECT_START_TIMESTAMP_KEY, {}),
+                }
+            return f(*args, **kwargs)
+
+        return wrapper
+
     def pytest_xdist_setupnodes(
         self, config: pytest.Config, specs: Sequence[execnet.XSpec]
     ) -> None:
         # print("pytest_xdist_setupnodes", config, specs)
         ...
 
-    def pytest_xdist_node_collection_finished(
-        self, node: WorkerController, ids: Sequence[str]
-    ) -> None:
-        # print("pytest_xdist_node_collection_finished", node, ids)
-        ...
+    def pytest_xdist_node_collection_finished(self, node: WorkerController) -> None:
+        print(
+            "Collection duration:",
+            time.time() - self.config.stash[COLLECT_START_TIMESTAMP_KEY][node.gateway.id],
+        )
 
     def pytest_configure_node(self, node: WorkerController) -> None:
         print("pytest_configure_node", node)
-        node.process_from_remote = process_from_remote_wrapper(node.process_from_remote, node)
+        node.process_from_remote = self.process_from_remote_wrapper(node.process_from_remote, node)
         self.workers.append(node)
 
     def pytest_testnodeready(self, node: WorkerController) -> None:
