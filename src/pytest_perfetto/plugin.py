@@ -17,13 +17,11 @@ from typing import (
     Generator,
     List,
     Optional,
-    Sequence,
     Tuple,
     Union,
     cast,
 )
 
-import execnet
 import pyinstrument
 import pytest
 from _pytest.config import Notset
@@ -40,6 +38,7 @@ from pytest_perfetto import (
 from pytest_perfetto.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
+START_COLLECTION_NAME: Final[str] = "Start Collection"
 
 
 class PytestPerfettoPlugin:
@@ -79,7 +78,7 @@ class PytestPerfettoPlugin:
     def pytest_collection(self) -> Generator[None, None, None]:
         self.events.append(
             BeginDurationEvent(
-                name="Start Collection",
+                name=START_COLLECTION_NAME,
                 cat=Category("pytest"),
             )
         )
@@ -165,6 +164,7 @@ class PytestPerfettoPlugin:
 # TODO: Ensure that plugin is not registered if the xdist plugin is not registered.
 
 COLLECT_START_TIMESTAMP_KEY: pytest.StashKey[Dict[str, float]] = pytest.StashKey()
+WORKER_PID_ID: pytest.StashKey[Dict[str, int]] = pytest.StashKey()
 # EVENTS: pytest.StashKey[List[SerializableEvent]] = pytest.StashKey()
 
 
@@ -175,6 +175,7 @@ class XDistExperimentPlugin:
     def __init__(self, config: pytest.Config) -> None:
         self.workers: List[WorkerController] = []
         self.config = config
+        self.serializable_events: List[SerializableEvent] = []
 
     def process_from_remote_wrapper(self, f: Callable[..., None], node: WorkerController) -> Any:
         """pytest-xdist does not track how long the collection phase takes. Although pytest-xdist
@@ -204,26 +205,49 @@ class XDistExperimentPlugin:
 
         return wrapper
 
-    def pytest_xdist_setupnodes(
-        self, config: pytest.Config, specs: Sequence[execnet.XSpec]
-    ) -> None:
-        # print("pytest_xdist_setupnodes", config, specs)
-        ...
-
-    def pytest_xdist_node_collection_finished(self, node: WorkerController) -> None:
-        print(
-            "Collection duration:",
-            time.time() - self.config.stash[COLLECT_START_TIMESTAMP_KEY][node.gateway.id],
-        )
+    def pytest_xdist_setupnodes(self, config: pytest.Config) -> None:
+        config.stash[WORKER_PID_ID] = {}
 
     def pytest_configure_node(self, node: WorkerController) -> None:
         print("pytest_configure_node", node)
         node.process_from_remote = self.process_from_remote_wrapper(node.process_from_remote, node)
         self.workers.append(node)
+        self.config.stash[WORKER_PID_ID] = {
+            # Have the pid numbers start from one.
+            node.gateway.id: len(self.config.stash[WORKER_PID_ID]) + 1
+        }
 
-    def pytest_testnodeready(self, node: WorkerController) -> None:
-        # print("pytest_testnodeready", node)
-        ...
+    def pytest_xdist_node_collection_finished(self, node: WorkerController) -> None:
+        collection_finished_timestmap: Timestamp = Timestamp(time.time())
+        worker_id: str = node.gateway.id
+
+        start_collection_timestamp: Optional[float] = self.config.stash[
+            COLLECT_START_TIMESTAMP_KEY
+        ].get(worker_id)
+
+        if start_collection_timestamp is None:
+            raise ValueError(
+                f"The timestamp of when collection started for node {node.gateway.id} does not"
+                " exist"
+            )
+
+        pid: Optional[int] = self.config.stash[WORKER_PID_ID].get(worker_id)
+
+        if pid is None:
+            raise ValueError(f"The pid for node '{worker_id}' was not created")
+
+        self.serializable_events.append(
+            BeginDurationEvent(
+                name=START_COLLECTION_NAME,
+                cat=Category("pytest"),
+                ts=Timestamp(start_collection_timestamp),
+                pid=pid,
+            )
+        )
+
+        self.serializable_events.append(EndDurationEvent(pid=pid, ts=collection_finished_timestmap))
+
+    def pytest_testnodeready(self, node: WorkerController) -> None: ...
 
     def pytest_sessionfinish(self) -> None:
         print(self.config.stash.get(cast(pytest.StashKey[object], COLLECT_START_TIMESTAMP_KEY), {}))
