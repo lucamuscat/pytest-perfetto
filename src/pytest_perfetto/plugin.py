@@ -33,10 +33,16 @@ class PytestPerfettoPlugin:
 
     @contextmanager
     def __profile(
-        self, root_frame_name: str, is_async: bool = False
+        self,
+        root_frame_name: str,
+        is_async: bool = False,
+        args: Optional[Dict[str, Union[str, Sequence[str]]]] = None,
     ) -> Generator[List[SerializableEvent], None, None]:
+        if args is None:
+            args = {}
+
         result: List[SerializableEvent] = []
-        start_event = BeginDurationEvent(name=root_frame_name, cat=Category("test"))
+        start_event = BeginDurationEvent(name=root_frame_name, cat=Category("test"), args=args)
 
         result.append(start_event)
         profiler_async_mode = "enabled" if is_async else "disabled"
@@ -167,12 +173,11 @@ class PytestPerfettoPlugin:
             "params": list(map(str, fixturedef.params)) if fixturedef.params else "",
             "scope": fixturedef.scope,
         }
-        self.events.append(
-            BeginDurationEvent(name=fixturedef.argname, cat=Category("test"), args=args)
-        )
 
-        yield
-        self.events.append(EndDurationEvent())
+        with self.__profile(root_frame_name=fixturedef.argname, args=args) as events:
+            yield
+
+        self.events += events
 
 
 # ===== Initialization hooks =====
