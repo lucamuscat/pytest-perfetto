@@ -130,6 +130,12 @@ class PytestPerfettoPlugin:
             self.events += render(profile.last_session, start_time=start_event.ts)
         self.events.append(EndDurationEvent())
 
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
+    def pytest_runtest_makereport(self) -> Generator[None, None, None]:
+        self.events.append(BeginDurationEvent(name="pytest make report", cat=Category("pytest")))
+        yield
+        self.events.append(EndDurationEvent())
+
     # ===== Reporting hooks =====
     @pytest.hookimpl(hookwrapper=True)
     def pytest_fixture_setup(
