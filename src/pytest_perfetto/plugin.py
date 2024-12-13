@@ -5,6 +5,7 @@ The pytest-perfetto plugin aims to help developers profile their tests by ultima
 
 import inspect
 import json
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Final, Generator, List, Optional, Sequence, Tuple, Union
@@ -29,6 +30,26 @@ PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 class PytestPerfettoPlugin:
     def __init__(self) -> None:
         self.events: List[SerializableEvent] = []
+
+    @contextmanager
+    def __profile(
+        self, root_frame_name: str, is_async: bool = False
+    ) -> Generator[List[SerializableEvent], None, None]:
+        result: List[SerializableEvent] = []
+        start_event = BeginDurationEvent(name=root_frame_name, cat=Category("test"))
+
+        result.append(start_event)
+        profiler_async_mode = "enabled" if is_async else "disabled"
+        with pyinstrument.Profiler(async_mode=profiler_async_mode) as profile:
+            yield result
+        end_event = EndDurationEvent()
+        start_rendering_event = BeginDurationEvent(
+            name="[pytest-perfetto] Dumping frames", cat=Category("pytest")
+        )
+        if profile.last_session is not None:
+            result += render(profile.last_session, start_time=start_event.ts)
+        end_rendering_event = EndDurationEvent()
+        result += [end_event, start_rendering_event, end_rendering_event]
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_sessionstart(self) -> Generator[None, None, None]:
@@ -120,20 +141,12 @@ class PytestPerfettoPlugin:
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_pyfunc_call(self, pyfuncitem: pytest.Function) -> Generator[None, None, None]:
-        start_event = BeginDurationEvent(name="call", cat=Category("test"))
-        self.events.append(start_event)
         is_async = inspect.iscoroutinefunction(pyfuncitem.function)
-        profiler_async_mode = "enabled" if is_async else "disabled"
-        with pyinstrument.Profiler(async_mode=profiler_async_mode) as profile:
+
+        with self.__profile(root_frame_name="call", is_async=is_async) as events:
             yield
-        end_event = EndDurationEvent()
-        start_rendering_event = BeginDurationEvent(
-            name="[pytest-perfetto] Dumping frames", cat=Category("pytest")
-        )
-        if profile.last_session is not None:
-            self.events += render(profile.last_session, start_time=start_event.ts)
-        end_rendering_event = EndDurationEvent()
-        self.events += [end_event, start_rendering_event, end_rendering_event]
+
+        self.events += events
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self) -> Generator[None, None, None]:
