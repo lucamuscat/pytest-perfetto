@@ -17,6 +17,7 @@ from typing import (
     Generator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
@@ -95,10 +96,15 @@ class PytestPerfettoPlugin:
     # ===== Test running (runtest) hooks =====
     # https://docs.pytest.org/en/7.1.x/reference/reference.html#test-running-runtest-hooks
     @staticmethod
-    def create_args_from_location(location: Tuple[str, Optional[int], str]) -> Dict[str, str]:
+    def create_args_from_location(
+        location: Tuple[str, Optional[int], str],
+    ) -> Dict[str, Union[str, Sequence[str]]]:
         (file_name, line_number, test_name) = location
 
-        args = {"file_name": file_name, "test_name": test_name}
+        args: Dict[str, Union[str, Sequence[str]]] = {
+            "file_name": file_name,
+            "test_name": test_name,
+        }
 
         if line_number is not None:
             args["line_number"] = str(line_number)
@@ -141,7 +147,6 @@ class PytestPerfettoPlugin:
         self.events.append(EndDurationEvent())
 
     # ===== Reporting hooks =====
-
     @pytest.hookimpl(hookwrapper=True)
     def pytest_fixture_setup(
         self, fixturedef: pytest.FixtureDef[Any]
@@ -149,8 +154,9 @@ class PytestPerfettoPlugin:
         args = {
             "argnames": fixturedef.argnames,
             "baseid": fixturedef.baseid,
-            "ids": fixturedef.ids,
-            "params": fixturedef.params,
+            # `fixturedef.params` are not guaranteed to serializable via json.dump(s), as a param
+            # can be a sequence of objects of any type.
+            "params": list(map(str, fixturedef.params)) if fixturedef.params else "",
             "scope": fixturedef.scope,
         }
         self.events.append(

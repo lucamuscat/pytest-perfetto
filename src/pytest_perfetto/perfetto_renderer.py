@@ -102,7 +102,7 @@ def render(session: Session, start_time: float) -> List[SerializableEvent]:
                         name=name or "nothing",
                         cat=Category("runtime"),
                         ts=timestamp,
-                        args={"file": file, "line": line, "name": name},
+                        args={"file": file or "", "line": str(line or 0), "name": name or ""},
                     )
                 )
             elif (
