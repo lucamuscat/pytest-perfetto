@@ -126,9 +126,14 @@ class PytestPerfettoPlugin:
         profiler_async_mode = "enabled" if is_async else "disabled"
         with pyinstrument.Profiler(async_mode=profiler_async_mode) as profile:
             yield
+        end_event = EndDurationEvent()
+        start_rendering_event = BeginDurationEvent(
+            name="[pytest-perfetto] Dumping frames", cat=Category("pytest")
+        )
         if profile.last_session is not None:
             self.events += render(profile.last_session, start_time=start_event.ts)
-        self.events.append(EndDurationEvent())
+        end_rendering_event = EndDurationEvent()
+        self.events += [end_event, start_rendering_event, end_rendering_event]
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self) -> Generator[None, None, None]:
@@ -152,9 +157,9 @@ class PytestPerfettoPlugin:
         self.events.append(
             BeginDurationEvent(name=fixturedef.argname, cat=Category("test"), args=args)
         )
+
         yield
         self.events.append(EndDurationEvent())
-        pass
 
 
 # ===== Initialization hooks =====
