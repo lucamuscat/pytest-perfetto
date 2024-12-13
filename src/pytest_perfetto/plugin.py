@@ -134,7 +134,6 @@ class PytestPerfettoPlugin:
         args = {
             "argnames": fixturedef.argnames,
             "baseid": fixturedef.baseid,
-            "ids": fixturedef.ids,
             "params": fixturedef.params,
             "scope": fixturedef.scope,
         }
