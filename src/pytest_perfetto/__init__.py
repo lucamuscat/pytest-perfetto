@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Literal, NewType, Union
+from typing import Dict, Literal, NewType, Sequence, Union
 
 Category = NewType("Category", str)
 Timestamp = NewType("Timestamp", float)
@@ -53,7 +53,7 @@ class BeginDurationEvent(DurationEvent):
     ts: Timestamp = field(default_factory=lambda: Timestamp(time.time()))
     pid: int = 1
     tid: int = 1
-    args: Dict[str, Any] = field(default_factory=dict)
+    args: Dict[str, Union[str, Sequence[str]]] = field(default_factory=dict)
     ph: Literal[Phase.B] = Phase.B
 
 
