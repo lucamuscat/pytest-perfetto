@@ -1,4 +1,4 @@
-# Perfsephone, the pytest embedded profiler.
+# ☠️ Perfsephone, the pytest embedded profiler.
 Perfsephone is a pytest plugin that profiles tests running under pytest, whose results can be
 visualized using the [perfetto UI](https://perfetto.dev/), or chrome's builtin trace visualizer
 [about:tracing](about:tracing).
