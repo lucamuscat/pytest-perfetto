@@ -6,7 +6,7 @@ from typing import List
 import pytest
 from pyinstrument.frame import Frame
 
-from pytest_perfetto.perfetto_renderer import (
+from perfsephone.perfetto_renderer import (
     BLACKLISTED_MODULES,
     RootFrameCannotBeHoistedException,
     hoist,

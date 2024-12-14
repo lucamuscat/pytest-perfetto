@@ -1,5 +1,5 @@
 """
-The pytest-perfetto plugin aims to help developers profile their tests by ultimately producing a
+The perfsephone plugin aims to help developers profile their tests by ultimately producing a
 'perfetto' trace file, which may be natively visualized using most Chromium-based browsers.
 """
 
@@ -14,7 +14,7 @@ import pyinstrument
 import pytest
 from _pytest.config import Notset
 
-from pytest_perfetto import (
+from perfsephone import (
     BeginDurationEvent,
     Category,
     EndDurationEvent,
@@ -22,7 +22,7 @@ from pytest_perfetto import (
     SerializableEvent,
     Timestamp,
 )
-from pytest_perfetto.perfetto_renderer import render
+from perfsephone.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 

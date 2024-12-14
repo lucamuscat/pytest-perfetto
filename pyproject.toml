@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pytest-perfetto"
+name = "perfsephone"
 version = "0.1.0"
 description = ""
 authors = ["Luca Muscat <lucamuscat@gmail.com>"]
@@ -9,10 +9,10 @@ readme = "README.md"
 classifiers = [
     "Framework :: Pytest"
 ]
-name = "pytest-perfetto"
+name = "perfsephone"
 
 [tool.poetry.plugins."pytest11"]
-"pytest-perfetto" = "pytest_perfetto.plugin"
+"perfsephone" = "perfsephone.plugin"
 
 [tool.poetry.dependencies]
 python = "^3.8"

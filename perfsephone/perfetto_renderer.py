@@ -13,7 +13,7 @@ from pyinstrument.renderers.speedscope import (
 )
 from pyinstrument.session import Session
 
-from pytest_perfetto import (
+from perfsephone import (
     BeginDurationEvent,
     Category,
     EndDurationEvent,
