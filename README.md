@@ -3,6 +3,9 @@ Perfsephone is a pytest plugin that profiles tests running under pytest, whose r
 visualized using the [perfetto UI](https://perfetto.dev/), or chrome's builtin trace visualizer
 [about:tracing](about:tracing).
 
+Perfsephone integrates well with CI/CD pipelines by generating json files which may be consumed at a
+later time.
+
 ![A perfsephone generated trace file of FastAPI's test suite, visualized using ui.perfetto.dev](images/image.png)
 *A perfsephone generated trace file of FastAPI's test suite, visualized using ui.perfetto.dev*
 
