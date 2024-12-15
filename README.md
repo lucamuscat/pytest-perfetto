@@ -26,5 +26,5 @@ invocation:
 Although profiling tools for python already exist, they either:
 * Do not integrate well with pytest, leaving out essential data, such as time spent in test setup,
 test teardown, and collection time;
-* Generate too much cruft. Perfesphone filters out call stacks related to pytest internals, which
+* Generate too much cruft. Perfsephone filters out call stacks related to pytest internals, which
   cannot be optimized without optimizing pytest itself.
