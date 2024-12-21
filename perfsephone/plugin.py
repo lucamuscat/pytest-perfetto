@@ -22,6 +22,7 @@ from perfsephone import (
     SerializableEvent,
     Timestamp,
 )
+from perfsephone.fastapi import PROFILERS
 from perfsephone.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
@@ -149,8 +150,20 @@ class PytestPerfettoPlugin:
     def pytest_pyfunc_call(self, pyfuncitem: pytest.Function) -> Generator[None, None, None]:
         is_async = inspect.iscoroutinefunction(pyfuncitem.function)
 
+        thread_ids: Dict[int, int] = {}
+
         with self.__profile(root_frame_name="call", is_async=is_async) as events:
             yield
+        for profiler in PROFILERS:
+            if profiler.profiler.last_session:
+                if profiler.thread_id not in thread_ids:
+                    thread_ids[profiler.thread_id] = len(thread_ids) + 2
+                self.events += render(
+                    profiler.profiler.last_session,
+                    profiler.start_time,
+                    tid=thread_ids[profiler.thread_id],
+                )
+        PROFILERS.clear()
 
         self.events += events
 
