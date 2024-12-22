@@ -20,7 +20,7 @@ from perfsephone import (
     SerializableEvent,
     Timestamp,
 )
-from perfsephone.fastapi import set_profiler
+from perfsephone.fastapi import install_fastapi_hook
 from perfsephone.profiler import Profiler
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
@@ -31,11 +31,10 @@ class PytestPerfettoPlugin:
         self.events: List[SerializableEvent] = []
         self.profiler = Profiler()
         self.profiler.subscribe(lambda results: self.events.extend(results))
+        install_fastapi_hook(self.profiler)
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_sessionstart(self) -> Generator[None, None, None]:
-        set_profiler(self.profiler)
-
         # Called after the `Session` object has been created and before performing collection and
         # entering the run test loop.
         self.events.append(
