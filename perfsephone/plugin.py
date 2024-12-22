@@ -5,10 +5,12 @@ The perfsephone plugin aims to help developers profile their tests by ultimately
 
 import inspect
 import json
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Final, Generator, List, Optional, Sequence, Tuple, Union
 
+import pyinstrument
 import pytest
 from _pytest.config import Notset
 
@@ -20,8 +22,7 @@ from perfsephone import (
     SerializableEvent,
     Timestamp,
 )
-from perfsephone.fastapi import install_fastapi_hook
-from perfsephone.profiler import Profiler
+from perfsephone.perfetto_renderer import render
 
 PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 
@@ -29,9 +30,32 @@ PERFETTO_ARG_NAME: Final[str] = "perfetto_path"
 class PytestPerfettoPlugin:
     def __init__(self) -> None:
         self.events: List[SerializableEvent] = []
-        self.profiler = Profiler()
-        self.profiler.subscribe(lambda results: self.events.extend(results))
-        install_fastapi_hook(self.profiler)
+
+    @contextmanager
+    def __profile(
+        self,
+        root_frame_name: str,
+        is_async: bool = False,
+        args: Optional[Dict[str, Union[str, Sequence[str]]]] = None,
+    ) -> Generator[List[SerializableEvent], None, None]:
+        if args is None:
+            args = {}
+
+        result: List[SerializableEvent] = []
+        start_event = BeginDurationEvent(name=root_frame_name, cat=Category("test"), args=args)
+
+        result.append(start_event)
+        profiler_async_mode = "enabled" if is_async else "disabled"
+        with pyinstrument.Profiler(async_mode=profiler_async_mode) as profile:
+            yield result
+        end_event = EndDurationEvent()
+        start_rendering_event = BeginDurationEvent(
+            name="[pytest-perfetto] Dumping frames", cat=Category("pytest")
+        )
+        if profile.last_session is not None:
+            result += render(profile.last_session, start_time=start_event.ts)
+        end_rendering_event = EndDurationEvent()
+        result += [end_event, start_rendering_event, end_rendering_event]
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_sessionstart(self) -> Generator[None, None, None]:
@@ -125,8 +149,10 @@ class PytestPerfettoPlugin:
     def pytest_pyfunc_call(self, pyfuncitem: pytest.Function) -> Generator[None, None, None]:
         is_async = inspect.iscoroutinefunction(pyfuncitem.function)
 
-        with self.profiler(root_frame_name="call", is_async=is_async):
+        with self.__profile(root_frame_name="call", is_async=is_async) as events:
             yield
+
+        self.events += events
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self) -> Generator[None, None, None]:
@@ -148,8 +174,10 @@ class PytestPerfettoPlugin:
             "scope": fixturedef.scope,
         }
 
-        with self.profiler(root_frame_name=fixturedef.argname, args=args):
+        with self.__profile(root_frame_name=fixturedef.argname, args=args) as events:
             yield
+
+        self.events += events
 
 
 # ===== Initialization hooks =====
