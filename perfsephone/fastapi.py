@@ -1,33 +1,26 @@
 import functools
-import threading
-import time
-from dataclasses import dataclass
-from typing import Any, Callable, List
+from typing import Any, Callable
 
-import pyinstrument
 from fastapi.routing import APIRouter
 
+import perfsephone
+import perfsephone.profiler
 
-@dataclass(frozen=True)
-class FastAPIProfiler:
-    profiler: pyinstrument.Profiler
-    thread_id: int
-    start_time: float
+__profiler: perfsephone.profiler.Profiler = perfsephone.profiler.Profiler()
 
 
-PROFILERS: List[FastAPIProfiler] = []
+def set_profiler(profiler: perfsephone.profiler.Profiler) -> None:
+    global __profiler  # noqa: PLW0603
+    __profiler = profiler
 
 
 def __profiler_wrapper(endpoint: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time: float = time.time()
-        with pyinstrument.Profiler() as profiler:
+        # TODO: Figure out why the thread id for events in other threads is not being populated. If
+        # this does not work out, ditch the whole profiler thing and pass around pyinstrument
+        # sessions.
+        with __profiler(root_frame_name=endpoint.__name__):
             result = endpoint(*args, **kwargs)
-        PROFILERS.append(
-            FastAPIProfiler(
-                profiler=profiler, thread_id=threading.get_ident(), start_time=start_time
-            )
-        )
         return result
 
     return wrapper
@@ -42,5 +35,5 @@ def __add_route_wrapper(
     APIRouter.__original_add_api_route__(router, path, profiler_wrapper, **kwargs)  # type: ignore
 
 
-APIRouter.__original_add_api_route__ = APIRouter.add_api_route
-APIRouter.add_api_route = __add_route_wrapper
+APIRouter.__original_add_api_route__ = APIRouter.add_api_route  # type: ignore
+APIRouter.add_api_route = __add_route_wrapper  # type: ignore
