@@ -7,6 +7,7 @@ import pytest
 def test_given_test_client__when_run_test__then_include_route_in_separate_thread(
     pytester: pytest.Pytester, temp_perfetto_file_path: Path
 ) -> None:
+    pytest.importorskip("fastapi")
     pytester.makepyfile("""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
