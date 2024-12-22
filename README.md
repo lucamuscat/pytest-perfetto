@@ -28,3 +28,10 @@ Although profiling tools for python already exist, they either:
 test teardown, and collection time;
 * Generate too much cruft. Perfsephone filters out call stacks related to pytest internals, which
   cannot be optimized without optimizing pytest itself.
+
+# Development
+Perfsephone's dependencies is managed using [*poetry*](https://python-poetry.org/docs/#installation).
+
+## Tests
+In order to run the project's unit tests & linting suite, run the following command:
+`poetry run tox -p`
